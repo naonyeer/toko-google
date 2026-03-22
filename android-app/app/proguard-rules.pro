@@ -1,0 +1,1 @@
+# My Kedai WebView rules

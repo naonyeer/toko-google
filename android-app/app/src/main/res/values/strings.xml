@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">My Kedai</string>
+    <string name="offline_title">Tidak ada koneksi</string>
+    <string name="offline_message">Periksa internet Anda lalu tarik ke bawah atau tekan tombol coba lagi.</string>
+    <string name="retry">Coba lagi</string>
+</resources>

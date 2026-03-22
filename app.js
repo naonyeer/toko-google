@@ -8,6 +8,32 @@ const DB = {
     connected: false,
     cache: { products: [], transactions: [] },
 
+    isLocalDev() {
+        return ['127.0.0.1', 'localhost'].includes(window.location.hostname);
+    },
+
+    buildRequestUrl(action) {
+        if (this.isLocalDev()) {
+            return `/api?action=${encodeURIComponent(action)}&target=${encodeURIComponent(this.apiUrl)}`;
+        }
+        return this.apiUrl + '?action=' + action;
+    },
+
+    async parseResponse(response) {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            if (text.includes('Fungsi skrip tidak ditemukan: doGet')) {
+                throw new Error('Apps Script yang dipakai belum berisi doGet/doPost. Paste ulang `Code.gs` terbaru lalu deploy ulang Web App.');
+            }
+            if (text.includes('<!DOCTYPE html')) {
+                throw new Error('Apps Script mengembalikan halaman HTML, bukan JSON. Cek URL Web App dan deploy Apps Script terbaru.');
+            }
+            throw new Error('Respons backend tidak valid. ' + text.slice(0, 160));
+        }
+    },
+
     init() {
         this.apiUrl = localStorage.getItem('mykedai_apiUrl') || '';
         if (this.apiUrl) {
@@ -35,7 +61,7 @@ const DB = {
     async request(action, data = null) {
         if (!this.apiUrl) throw new Error('API URL belum dikonfigurasi. Buka Pengaturan.');
 
-        const url = this.apiUrl + '?action=' + action;
+        const url = this.buildRequestUrl(action);
 
         try {
             let response;
@@ -43,21 +69,13 @@ const DB = {
                 response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(data),
-                    mode: 'no-cors'
+                    body: JSON.stringify(data)
                 });
             } else {
                 response = await fetch(url);
             }
 
-            // no-cors mode returns opaque response for POST, use GET for reads
-            if (data) {
-                // For write operations with no-cors, we can't read the response
-                // Use a follow-up GET to verify
-                return { status: 'ok' };
-            }
-
-            const result = await response.json();
+            const result = await this.parseResponse(response);
             this.updateSyncStatus(true);
             return result;
         } catch (err) {
@@ -71,24 +89,21 @@ const DB = {
     async apiCall(action, data = null) {
         if (!this.apiUrl) throw new Error('API URL belum dikonfigurasi!');
 
-        let url = this.apiUrl + '?action=' + action;
+        let url = this.buildRequestUrl(action);
 
         if (data) {
-            // For POST: use fetch with redirect follow
-            // Google Apps Script redirects, so we send via URL params for small data
-            // or use a form-based approach
             const response = await fetch(url, {
                 method: 'POST',
                 body: JSON.stringify(data),
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 redirect: 'follow'
             });
-            const result = await response.json();
+            const result = await this.parseResponse(response);
             this.updateSyncStatus(true);
             return result;
         } else {
             const response = await fetch(url, { redirect: 'follow' });
-            const result = await response.json();
+            const result = await this.parseResponse(response);
             this.updateSyncStatus(true);
             return result;
         }
