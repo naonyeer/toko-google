@@ -146,6 +146,14 @@ const DB = {
         return res;
     },
 
+    async deleteTransaction(id) {
+        const res = await this.apiCall('deleteTransaction', { id });
+        if (res.status !== 'ok') throw new Error(res.message || 'Gagal menghapus transaksi');
+        await this.getProducts();
+        await this.getTransactions();
+        return res;
+    },
+
     // ---- Store Info ----
     async getStoreInfo() {
         try {
@@ -175,7 +183,7 @@ const Utils = {
     isToday(d) { const t = new Date(), dd = new Date(d); return t.toDateString() === dd.toDateString(); },
     daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(0, 0, 0, 0); return d; },
     categoryEmoji(cat) {
-        const map = { 'Makanan': '🍚', 'Minuman': '🥤', 'Snack': '🍿', 'Kebutuhan Rumah': '🏠', 'Elektronik': '⚡', 'Lainnya': '📦' };
+        const map = { 'Makanan': '🍚', 'Minuman': '🥤', 'Snack': '🍿', 'Rokok': '🚬', 'Alat': '🛠️', 'Kebutuhan Rumah': '🏠', 'Elektronik': '⚡', 'Lainnya': '📦' };
         return map[cat] || '📦';
     },
     toast(msg, type = 'success') {
@@ -560,7 +568,7 @@ const History = {
         if (!txns.length) { el.innerHTML = '<tr><td colspan="6" class="empty-state-small">Tidak ada transaksi</td></tr>'; return; }
         el.innerHTML = txns.map(t => {
             const items = (t.items || []).map(i => `${i.name} x${i.qty}`).join(', ');
-            return `<tr><td style="color:var(--text-primary);font-weight:600">${t.id}</td><td>${Utils.formatDateTime(t.date)}</td><td>${items.length > 35 ? items.slice(0, 35) + '...' : items}</td><td style="font-weight:700;color:var(--accent-blue)">${Utils.formatRupiah(t.total)}</td><td><span class="badge badge-${t.method}">${t.method}</span></td><td><button class="action-btn" onclick="History.showDetail('${t.id}')">👁️</button></td></tr>`;
+            return `<tr><td style="color:var(--text-primary);font-weight:600">${t.id}</td><td>${Utils.formatDateTime(t.date)}</td><td>${items.length > 35 ? items.slice(0, 35) + '...' : items}</td><td style="font-weight:700;color:var(--accent-blue)">${Utils.formatRupiah(t.total)}</td><td><span class="badge badge-${t.method}">${t.method}</span></td><td><div class="action-btns"><button class="action-btn" onclick="History.showDetail('${t.id}')">👁️</button><button class="action-btn delete" onclick="History.deleteTransaction('${t.id}')">🗑️</button></div></td></tr>`;
         }).join('');
     },
     filterByDate() { this.renderList(); },
@@ -572,6 +580,21 @@ const History = {
         html += `</tbody></table><div style="margin-top:1rem;text-align:right"><strong>Total: ${Utils.formatRupiah(t.total)}</strong></div>`;
         document.getElementById('detailContent').innerHTML = html;
         document.getElementById('detailModal').classList.add('active');
+    },
+    async deleteTransaction(id) {
+        if (!DB.connected) { Utils.toast('Belum terhubung ke Spreadsheet!', 'error'); return; }
+        if (!confirm('Hapus transaksi ini dari riwayat dan kembalikan stok produknya?')) return;
+        try {
+            await DB.deleteTransaction(id);
+            Dashboard.refresh();
+            await this.refresh();
+            Stats.refresh();
+            Settings.refresh();
+            this.closeDetail();
+            Utils.toast('Transaksi berhasil dihapus.', 'success');
+        } catch (e) {
+            Utils.toast('Gagal menghapus transaksi: ' + e.message, 'error');
+        }
     },
     closeDetail() { document.getElementById('detailModal').classList.remove('active'); }
 };
@@ -694,12 +717,6 @@ const Settings = {
     downloadCSV(content, filename) {
         const blob = new Blob([content], { type: 'text/csv' }); const a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-    },
-    clearAllData() {
-        if (!confirm('PERINGATAN: Ini hanya menghapus cache lokal. Data di Spreadsheet tetap aman. Lanjutkan?')) return;
-        DB.cache.products = []; DB.cache.transactions = [];
-        Utils.toast('Cache lokal dihapus. Refresh untuk memuat ulang dari Spreadsheet.', 'info');
-        this.refresh();
     }
 };
 

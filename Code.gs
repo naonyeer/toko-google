@@ -10,7 +10,7 @@
  * 5. Pilih "Web app"
  * 6. Set "Execute as" = Me, "Who has access" = Anyone
  * 7. Klik Deploy dan copy URL-nya
- * 8. Paste URL ke Pengaturan di aplikasi TokoKu
+ * 8. Paste URL ke Pengaturan di aplikasi My Kedai
  */
 
 // ============ CONFIG ============
@@ -114,6 +114,9 @@ function handleRequest(e) {
       case 'addTransaction':
         result = addTransaction(postData);
         break;
+      case 'deleteTransaction':
+        result = deleteTransaction(params.id || postData.id);
+        break;
         
       // ---- INFO TOKO ----
       case 'getStoreInfo':
@@ -125,11 +128,11 @@ function handleRequest(e) {
       
       // ---- TEST ----
       case 'ping':
-        result = { status: 'ok', message: 'TokoKu API terhubung!' };
+        result = { status: 'ok', message: 'My Kedai API terhubung!' };
         break;
         
       default:
-        result = { status: 'ok', message: 'TokoKu API aktif. Gunakan parameter action.' };
+        result = { status: 'ok', message: 'My Kedai API aktif. Gunakan parameter action.' };
     }
     
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -332,6 +335,62 @@ function addTransaction(data) {
   updateStock(items);
   
   return { status: 'ok', id: txId, message: 'Transaksi berhasil disimpan' };
+}
+
+function deleteTransaction(id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tSheet = ss.getSheetByName(SHEET_TRANSAKSI);
+  const dSheet = ss.getSheetByName(SHEET_DETAIL);
+  const pSheet = ss.getSheetByName(SHEET_PRODUK);
+  const transactionRows = tSheet.getDataRange().getValues();
+  const detailRows = dSheet.getDataRange().getValues();
+  const productRows = pSheet.getDataRange().getValues();
+  const targetId = String(id || '');
+
+  if (!targetId) {
+    return { status: 'error', message: 'ID transaksi wajib diisi' };
+  }
+
+  const detailIndexes = [];
+  const stockReturns = {};
+
+  for (let i = 1; i < detailRows.length; i++) {
+    if (String(detailRows[i][0]) === targetId) {
+      detailIndexes.push(i + 1);
+      const productId = String(detailRows[i][1]);
+      stockReturns[productId] = (stockReturns[productId] || 0) + Number(detailRows[i][5] || 0);
+    }
+  }
+
+  let transactionRowNumber = 0;
+  for (let i = 1; i < transactionRows.length; i++) {
+    if (String(transactionRows[i][0]) === targetId) {
+      transactionRowNumber = i + 1;
+      break;
+    }
+  }
+
+  if (!transactionRowNumber) {
+    return { status: 'error', message: 'Transaksi tidak ditemukan' };
+  }
+
+  Object.keys(stockReturns).forEach(function(productId) {
+    for (let i = 1; i < productRows.length; i++) {
+      if (String(productRows[i][0]) === productId) {
+        const currentStock = Number(productRows[i][5] || 0);
+        pSheet.getRange(i + 1, 6).setValue(currentStock + stockReturns[productId]);
+        break;
+      }
+    }
+  });
+
+  detailIndexes.sort(function(a, b) { return b - a; }).forEach(function(rowNumber) {
+    dSheet.deleteRow(rowNumber);
+  });
+
+  tSheet.deleteRow(transactionRowNumber);
+
+  return { status: 'ok', deletedId: targetId, message: 'Transaksi berhasil dihapus' };
 }
 
 // ============ INFO TOKO FUNCTIONS ============
