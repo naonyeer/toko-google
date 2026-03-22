@@ -1,5 +1,5 @@
 // ==========================================
-// TokoKu - Google Spreadsheet Database App
+// My Kedai - Google Spreadsheet Database App
 // ==========================================
 
 // ==================== SPREADSHEET DATABASE ====================
@@ -9,7 +9,7 @@ const DB = {
     cache: { products: [], transactions: [] },
 
     init() {
-        this.apiUrl = localStorage.getItem('tokoku_apiUrl') || '';
+        this.apiUrl = localStorage.getItem('mykedai_apiUrl') || '';
         if (this.apiUrl) {
             this.connected = true;
             this.updateSyncStatus(true);
@@ -18,7 +18,7 @@ const DB = {
 
     setApiUrl(url) {
         this.apiUrl = url;
-        localStorage.setItem('tokoku_apiUrl', url);
+        localStorage.setItem('mykedai_apiUrl', url);
         this.connected = !!url;
         this.updateSyncStatus(!!url);
     },
@@ -152,7 +152,7 @@ const DB = {
             const res = await this.apiCall('getStoreInfo');
             if (res.status === 'ok') return res.data;
         } catch (e) { /* fallback */ }
-        return { name: 'TokoKu', address: '', phone: '' };
+        return { name: 'My Kedai', address: '', phone: '' };
     },
 
     async saveStoreInfo(info) {
@@ -455,7 +455,7 @@ const Kasir = {
         }
     },
     showReceipt(txn) {
-        const info = { name: document.getElementById('storeName').value || 'TokoKu', address: document.getElementById('storeAddress').value || '', phone: document.getElementById('storePhone').value || '' };
+        const info = { name: document.getElementById('storeName').value || 'My Kedai', address: document.getElementById('storeAddress').value || '', phone: document.getElementById('storePhone').value || '' };
         let html = `<div class="receipt-header"><h4>${info.name}</h4>`;
         if (info.address) html += `<p>${info.address}</p>`;
         if (info.phone) html += `<p>${info.phone}</p>`;
@@ -629,14 +629,14 @@ const Stats = {
 const Settings = {
     async init() {
         // Load API URL
-        const apiUrl = localStorage.getItem('tokoku_apiUrl') || '';
+        const apiUrl = localStorage.getItem('mykedai_apiUrl') || '';
         document.getElementById('appsScriptUrl').value = apiUrl;
 
         // Load store info from cache or spreadsheet
         if (DB.connected) {
             try {
                 const info = await DB.getStoreInfo();
-                document.getElementById('storeName').value = info.name || 'TokoKu';
+                document.getElementById('storeName').value = info.name || 'My Kedai';
                 document.getElementById('storeAddress').value = info.address || '';
                 document.getElementById('storePhone').value = info.phone || '';
             } catch (e) { }
@@ -685,10 +685,10 @@ const Settings = {
         const txns = DB.cache.transactions;
         let csv = 'Nama,Kategori,Harga Beli,Harga Jual,Stok,Barcode\n';
         products.forEach(p => { csv += `"${p.name}","${p.category}",${p.cost},${p.price},${p.stock},"${p.barcode || ''}"\n`; });
-        this.downloadCSV(csv, 'produk_tokoku.csv');
+        this.downloadCSV(csv, 'produk_mykedai.csv');
         let tcsv = 'No Transaksi,Tanggal,Items,Total,Metode\n';
         txns.forEach(t => { tcsv += `"${t.id}","${t.date}","${(t.items || []).map(i => i.name + 'x' + i.qty).join('; ')}",${t.total},"${t.method}"\n`; });
-        this.downloadCSV(tcsv, 'transaksi_tokoku.csv');
+        this.downloadCSV(tcsv, 'transaksi_mykedai.csv');
         Utils.toast('Data berhasil diexport!', 'success');
     },
     downloadCSV(content, filename) {
